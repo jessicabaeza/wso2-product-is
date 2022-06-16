@@ -1,0 +1,319 @@
+spring.profiles.active: resi, dev-altair, routing
+# microservice, 
+# aea-client, aea-host, dev-client, 
+
+#hz,
+#profiles for logic mode: mt / pas / pcas / t3270
+#profiles for host: preuk
+#profiles for hazelcast: hz
+#profiles for use resilience: resi
+#profiles for full debug information: debug
+
+spring:
+  application:
+    name: ACCSwitchApp
+
+server:
+  port: 8443
+#  ssl:
+#    key-store-type: PKCS12
+#    key-store: jks/baeldung.p12
+#    key-store-password: baeldung.p12
+#    enabled: true
+#    protocol: TLS
+#    enabled-protocols: TLSv1.2   
+#    key-alias: baeldung
+
+logging:
+  config: ./config/log4j2.xml
+  level:
+    org.springframework.bean: TRACE
+
+management.endpoints.web.exposure.include: refresh
+    
+#logging:
+#  level:
+#    com.isban.altairswitch.core: DEBUG  #INFO is default value
+#    com.isban: DEBUG
+#    org.apache.kafka: WARN
+#    org.springframework.bean: DEBUG
+
+---
+
+# Profile to activate hazelcast externo
+spring:
+  profiles: hz
+
+# La configuracion de este profile para crear un cliente de hazelcast cluster la lee del fichero: hz.yml
+
+---
+
+# Profile to activate hazelcast interno
+spring:
+  profiles: hz-deb
+
+# Solo para pruebas internas.
+# Crea en la JVM una instancia embebida de hazelcast.
+# No hay que configurar nada.
+
+---
+
+# Profile to activate to connect to cert client mq
+spring:
+  profiles: dev-client
+
+mq:
+  queueManager: DESPAMPA6
+  host: ISLPASSC01.SCISB.ISBAN.CORP
+  channel: CLNT.DUPLICADOR 
+
+---
+
+# Profile to activate to connect to DEV ALTAIR
+spring:
+  profiles: dev-altair
+
+mq:
+  queueManager: MQLAB.QM
+  host: 107.104.193.152
+  channel: MQLAB.CH
+  ####  Por defecto se usa cachingConnectionFactory
+  useCachingConnection: false   # valor por defecto es true
+  sessionCacheSize: 20 			# Se usa cuando useCachingConnection = true
+  ####  
+  useMessageListenerContainer: true # valor por defecto false
+  concurrency: 5-10 # Se usa cuando useMessageListenerContainer = true
+  receiveTimeout: 0 # Se usa cuando useMessageListenerContainer = true
+  
+---
+
+# Profile to activate to connect to preuk
+spring:
+  profiles: preuk
+
+mq:
+  queueManager: MQGRPAST1
+  useclient: false
+#  host: isblccrhatp0025.scisb.isban.corp
+#  port: 1414
+#  channel: CLNT.DUPLICADOR
+    
+---
+
+# Profile to activate AEA ClIENT-TO-HOST MODE
+spring:
+  profiles: aea-client
+
+aeamode:
+   master: original   # original, replica, pan
+   dualRun: true
+   compare: true
+   wait4master: false  # En caso de dual run, esperar la respuesta del master antes de enviar la segunda peticion.
+
+aea-client.respQueues:
+  hostOriginal: UKBR_PASCSRECANSSW3_1  # Cola de respuestas desde HOST ORIGINAL (Original --> Switch)
+  hostReplica:  UKBR_PASCSRECANSSW3_2  # Cola de respuestas desde HOST REPLICA  (Replica  --> Switch)
+
+aea-client.services:
+  - name: MPPEN003
+    reqQueues:
+      sw:         UKBR_PASCHENVREQA         # Cola de requerimientos hacia Switch   (Client --> Switch)
+      hostOrig:   UKBR_PASCHENVREQSW3_1     # Cola de requerimientos hacia Host Original (Switch --> Original)
+      hostRepl:   UKBR_PASCHENVREQSW3_1     # Cola de requerimientos hacia Host Replica  (Switch --> Replica)
+  - name: MPPEN004
+    reqQueues:
+      sw:         UKBR_PASCHENVREQB         # Cola de requerimientos hacia Switch   (Client --> Switch)
+      hostOrig:   UKBR_PASCHENVREQSW4_1     # Cola de requerimientos hacia Host Original (Switch --> Original)
+      hostRepl:   UKBR_PASCHENVREQSW4_2     # Cola de requerimientos hacia Host Replica  (Switch --> Replica)
+
+---
+
+# Profile to activate  AEA HOST-TO-CLIENT MODE
+spring:
+  profiles: aea-host
+
+aeamode:
+   master: original   # original, replica, pan
+
+aea-host.services:
+  - name: online  # Es solo descriptivo. Copiado del PCAS de partenon.
+    hostOrig:
+      reqQueue: AEQREQ5_ZOS    # Cola de requerimientos hacia Switch     (Host Original --> Switch)
+      respQueue: AEQANS5_ZOS   # Cola de respuestas hacia Host Original  (Switch        --> Host Original)
+    hostRepl:
+      reqQueue: AEQREQ5_GRA    # Cola de requerimientos hacia Switch     (Host Replica  --> Switch)
+      respQueue: AEQANS5_GRA   # Cola de respuestas hacia Host Replica   (Switch        --> Host Replica)
+    client:
+      reqQueue: AEQREQ5_ADR    # Cola de requerimientos hacia Cliente    (Switch   --> Cliente )
+      respQueue: AEQANS5_ADR   # Cola de respuestas hacia Switch         (Cliente  --> Switch)
+  - name: offline  # Es solo descriptivo. Copiado del PCAS de partenon.
+    hostOrig:
+      reqQueue: AEQREQ6_ZOS    # Cola de requerimientos hacia Switch     (Host Original --> Switch)
+      respQueue: AEQANS6_ZOS   # Cola de respuestas hacia Host Original  (Switch        --> Host Original)
+    hostRepl:
+      reqQueue: AEQREQ6_GRA    # Cola de requerimientos hacia Switch     (Host Replica  --> Switch)
+      respQueue: AEQANS6_GRA        # Cola de respuestas hacia Host Replica   (Switch        --> Host Replica)
+    client:
+      reqQueue: AEQREQ6_ADR    # Cola de requerimientos hacia Cliente    (Switch   --> Cliente )
+      respQueue: AEQANS6_ADR   # Cola de respuestas hacia Switch         (Cliente  --> Switch)
+
+---
+
+
+# Profile to activate Altair - Microservice MODE
+spring:
+  profiles: microservice
+
+#Control ... 
+microservice.mode: normal   # normal: Si existe la TRX va a MS sino va a Altair, test , verify 
+microservice.active: true
+microservice.fallback: true
+microservice.count: 1  # Cada cuantas ejecuciones voy a comparar respuestas
+microservice.msgType: PS8
+
+microservice.qreq: SWT.QL.REQUEST.C   # Cola de entrada al Switch
+
+microservice.altairQueues: 
+  qreq: MQCICSPS7J.REQ      # Cola de entrada de Altair
+  qresp: MQCICSPS7J.RESP    # Cola de salida de Altair
+
+microservice.trustStore: 
+  path: file:./config/security/altairtruststore
+  password: altairswitch
+
+
+#Config ... 
+transactions.services:
+  - name: PE74
+    enable: true
+    useRetry: true
+#    endpoint: http://180.101.180.118:8285/PE74
+    endpoint: https://180.101.180.118:8248/PE74
+    timeout: 7000
+    retryMaxAttempts: 2
+#	trustStore: 
+#		path: file:./config/security/altairtruststore
+#		password: altairswitch
+    resilienceConfig: 
+      ringBufferSizeInHalfOpenState: 6
+      failureRateThreshold: 40
+  - name: QG10
+    enable: true
+    useRetry: false
+    endpoint: http://180.101.180.118:8285/PE74
+    timeout: 7000
+    retryMaxAttempts: 2
+
+
+---
+
+# Profile to activate resilience
+spring:
+  profiles: resi
+
+resilience:
+  timeout: 6000
+  useRetry: true
+  retryMaxAttempts: 3 
+  retryWaitDuration: 30 
+  circuitBreakerConf: 
+    - name: altair
+      waitDurationInOpenState: 8
+      ringBufferSizeInClosedState: 9
+      ringBufferSizeInHalfOpenState: 6
+      failureRateThreshold: 7
+    - name: microservice 
+      waitDurationInOpenState: 10
+      ringBufferSizeInClosedState: 10
+      ringBufferSizeInHalfOpenState: 6
+      failureRateThreshold: 40
+    - name: gravity
+      waitDurationInOpenState: 11
+      ringBufferSizeInClosedState: 11
+      ringBufferSizeInHalfOpenState: 11
+      failureRateThreshold: 11
+      
+
+---
+
+# Profile to activate Enrutador BR
+spring:
+  profiles: routing
+
+#Control ... 
+routing: 
+  master: altair  # altair o gravity (oara transacciones no definidas)
+  active: true
+  dual: true
+  secuential: true
+  compare: false   # Si se compara o no respuesta
+  trxLocations: "./config/routing/*.yml"
+  trxHotdeploy: "./config/hotdeploy/"
+  compareFilterFields:
+  - HORA
+  inputQueues: # Corresponde a las colas de entrada al Switch 
+    - 
+      name: PATO.SWT.QL.REQUEST.C
+      msgType: PS8 # Valores permitidos: PS7 - PS8 - CY - PZI
+    - 
+      name: MARCE.SWT.QL.REQUEST.C
+      msgType: PS7 # Valores permitidos: PS7 - PS8 - CY - PZI
+
+  altairQueues: 
+    qreq: ECODUMMY.QL.REQUEST      # Cola de entrada de Altair
+    qresp: MQCICSPS7.RESP    # Cola de salida de Altair
+
+  gravityQueues: 
+    qreq: ECODUMMY.QL.REQUEST      # Cola de entrada de Gravity
+    qresp: MQCICSPS7J.RESP    # Cola de salida de Gravity
+
+  transactions:
+
+
+---
+
+
+# Profile to activate comparador de respuestas 3270 o perfil "OUT" que son mensajes de entrada PS7
+spring:
+  profiles: compare3270
+
+#Control ... 
+compare: 
+  flavor: OUT  # Opciones: SW3270 - OUT
+  mode: compare   # The 3270 Switch has only one operating mode, the compare
+  charset: Cp284  # Java charset to decode some of the msg binary bytes
+  queues:         # Se esta utilizando para pruebas el MQ del servidor 180.101.180.118
+    - 
+      name: SW3270.ALT       # Queue with msgs of Altair as master and OHE as secondary.
+      type: altair
+    - 
+      name: SW3270.GRAV       # Queue with msgs of OHE as master and Altair as secondary.
+      type: gravity
+#  cache: comparador # Nombre del mapa a utilizar en cache para almacenar los mensajes mientras llega el par, este se usa para flavor SW3270    
+  master: altair        # Obligatorio para flavor OUT: Valores permitidos: altair - gravity 
+  altairQueue: MARCE1   # Obligatorio para flavor OUT
+  gravityQueue: MARCE2  # Obligatorio para flavor OUT
+  cache: out            # Obligatorio para flavor OUT: Nombre del mapa a utilizar en cache para almacenar los mensajes mientras llega el par   
+  msgType: PS7          # Obligatorio para flavor OUT: Valores permitidos: PS7 - PS8 - CY - PZI - REVISAR TIPOS DE DATOS!!!
+  transactions:         # Obligatorio para flavor OUT: Se indica por TRX como se forma la key del mensaje
+    - name: PE74
+      key: 
+        - PENUMPE
+#        - PETIPDO
+    - name: QG10
+      key:
+        - STAECO 
+
+
+
+
+# Profile to activate when debugging
+#spring:
+#  profiles: debug
+#  jackson:
+#    serialization:
+#      INDENT_OUTPUT: true
+#logging:
+#  level:
+#    com.isban.altairswitch.core: DEBUG
+#    org.springframework.bean: DEBUG
